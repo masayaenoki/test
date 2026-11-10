@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>スタッフ専用 顧客カルテ</title>
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <style>
+    body { font-family: sans-serif; background: #f4f5f7; margin: 0; padding: 16px; color: #333; }
+    .card { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    .photo { width: 100%; max-height: 250px; object-fit: cover; border-radius: 8px; margin-bottom: 16px; }
+    .item { display: flex; justify-content: space-between; border-bottom: 1px solid #eee; padding: 10px 0; }
+    .label { font-weight: bold; color: #666; }
+    .error { color: #e74c3c; font-weight: bold; text-align: center; margin-top: 20px; }
+    #loading { text-align: center; font-size: 14px; color: #888; }
+  </style>
+</head>
+<body>
+
+  <div id="loading">データ読み込み中...</div>
+
+  <div id="content" class="card" style="display: none;">
+    <img id="userPhoto" class="photo" src="" alt="顔写真">
+    <div class="item"><span class="label">お名前</span><span id="userName">-</span></div>
+    <div class="item"><span class="label">年齢</span><span id="userAge">-</span> 歳</div>
+    <div class="item"><span class="label">身長</span><span id="userHeight">-</span> cm</div>
+    <div class="item"><span class="label">体重</span><span id="userWeight">-</span> kg</div>
+  </div>
+
+  <div id="errorMessage" class="error"></div>
+
+  <script>
+    const LIFF_ID = "YOUR_LIFF_ID"; // LINE Developersで取得したLIFF ID
+    const GAS_WEBAPP_URL = "YOUR_GAS_WEBAPP_URL"; // GASのデプロイURL
+
+    async function main() {
+      await liff.init({ liffId: LIFF_ID });
+
+      if (!liff.isLoggedIn()) {
+        liff.login();
+        return;
+      }
+
+      // 1. 操作しているスタッフのLINE Profile情報を取得
+      const staffProfile = await liff.getProfile();
+      const staffId = staffProfile.userId;
+
+      // 2. URLのクエリパラメータから対象顧客のUser IDを取得（?target=USER_ID）
+      const urlParams = new URLSearchParams(window.location.search);
+      const targetUserId = urlParams.get('target');
+
+      if (!targetUserId) {
+        showError("対象の顧客IDが指定されていません。");
+        return;
+      }
+
+      // 3. GAS APIを呼び出し
+      try {
+        const response = await fetch(`${GAS_WEBAPP_URL}?action=getProfile&staffId=${staffId}&targetUserId=${targetUserId}`);
+        const data = await response.json();
+
+        if (data.error) {
+          showError(data.error);
+        } else if (data.success) {
+          document.getElementById('userName').innerText = data.name;
+          document.getElementById('userAge').innerText = data.age;
+          document.getElementById('userHeight').innerText = data.height;
+          document.getElementById('userWeight').innerText = data.weight;
+          document.getElementById('userPhoto').src = data.photoUrl;
+
+          document.getElementById('loading').style.display = 'none';
+          document.getElementById('content').style.display = 'block';
+        }
+      } catch (err) {
+        showError("通信エラーが発生しました。");
+      }
+    }
+
+    function showError(msg) {
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('errorMessage').innerText = msg;
+    }
+
+    main();
+  </script>
+</body>
+</html>
