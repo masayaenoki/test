@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>プロフィール登録</title>
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <style>
+    body { font-family: sans-serif; background: #f4f5f7; margin: 0; padding: 16px; color: #333; }
+    .card { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); max-width: 500px; margin: auto; }
+    .form-group { margin-bottom: 16px; }
+    label { display: block; font-weight: bold; margin-bottom: 6px; color: #555; }
+    input[type="text"], input[type="number"], input[type="file"] { width: 100%; padding: 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 6px; font-size: 16px; }
+    button { width: 100%; background: #06c755; color: white; border: none; padding: 14px; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; }
+    button:disabled { background: #ccc; }
+    #message { text-align: center; margin-top: 15px; font-weight: bold; }
+  </style>
+</head>
+<body>
+
+  <div class="card">
+    <h2>プロフィール登録</h2>
+    <form id="registerForm">
+      <div class="form-group">
+        <label>お名前（ニックネーム可）</label>
+        <input type="text" id="name" required placeholder="例：山田 太郎">
+      </div>
+      <div class="form-group">
+        <label>年齢</label>
+        <input type="number" id="age" required placeholder="例：30">
+      </div>
+      <div class="form-group">
+        <label>身長 (cm)</label>
+        <input type="number" step="0.1" id="height" required placeholder="例：170.5">
+      </div>
+      <div class="form-group">
+        <label>体重 (kg)</label>
+        <input type="number" step="0.1" id="weight" required placeholder="例：65.0">
+      </div>
+      <div class="form-group">
+        <label>顔写真（または全身写真）</label>
+        <input type="file" id="photo" accept="image/*" required>
+      </div>
+      <button type="submit" id="submitBtn">登録する</button>
+    </form>
+    <div id="message"></div>
+  </div>
+
+  <script>
+    const LIFF_ID = "2012535196-zRjjTwli"; // ← ユーザー登録用LIFF IDを設定
+    const GAS_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbzybM_8eGUFVEQTEiTjxUxecXhmtpuKKXIfCrWkDNV_4gAQEpHe487N4TVZpRTr09h0/exec"; // ← 先ほどと同じGASのウェブアプリURL
+
+    let lineUserId = "";
+
+    async function initLiff() {
+      try {
+        await liff.init({ liffId: LIFF_ID });
+        if (!liff.isLoggedIn()) {
+          liff.login();
+          return;
+        }
+        const profile = await liff.getProfile();
+        lineUserId = profile.userId; // ユーザーのLINE IDを自動取得
+        } catch (err) {
+          btn.disabled = false;
+          btn.innerText = "登録する";
+          msg.style.color = "#e74c3c";
+          // 詳細なエラー内容をそのまま画面に出す
+          msg.innerText = "エラー詳細: " + err.message;
+          console.error(err);
+        }
+    }
+
+    document.getElementById('registerForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const btn = document.getElementById('submitBtn');
+      const msg = document.getElementById('message');
+      btn.disabled = true;
+      btn.innerText = "送信中...";
+
+      const fileInput = document.getElementById('photo');
+      const file = fileInput.files[0];
+
+      //画像をBase64に変換
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = async function () {
+        const base64Data = reader.result.split(',')[1];
+        const mimeType = file.type;
+        const fileName = file.name;
+
+        const payload = {
+          action: "registerUser",
+          userId: lineUserId,
+          name: document.getElementById('name').value,
+          age: document.getElementById('age').value,
+          height: document.getElementById('height').value,
+          weight: document.getElementById('weight').value,
+          image: base64Data,
+          mimeType: mimeType,
+          fileName: fileName
+        };
+
+        try {
+          const response = await fetch(GAS_WEBAPP_URL, {
+            method: "POST",
+            body: JSON.stringify(payload)
+          });
+          const result = await response.json();
+
+          if (result.success) {
+            msg.style.color = "#06c755";
+            msg.innerText = "登録が完了しました！この画面を閉じてください。";
+            setTimeout(() => { liff.closeWindow(); }, 3000);
+          } else {
+            throw new Error(result.error || "登録に失敗しました。");
+          }
+        } catch (err) {
+          btn.disabled = false;
+          btn.innerText = "登録する";
+          msg.style.color = "#e74c3c";
+          msg.innerText = "エラー: " + err.message;
+        }
+      };
+    });
+
+    initLiff();
+  </script>
+</body>
+</html>
